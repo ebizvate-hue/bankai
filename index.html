@@ -72,22 +72,21 @@
       texture.magFilter = THREE.LinearFilter;
       texture.format = THREE.RGBFormat;
 
-      // وقتی ویدیو آماده شد، نسبت رو بگیر
-      video.addEventListener('loadedmetadata', () => {
-        let videoAspect = video.videoWidth / video.videoHeight;
-        let markerSize = 1; // ضلع مارکر = 1 واحد
-        let height = markerSize; 
-        let width = markerSize * videoAspect;
+      // نسبت تصویر ویدیو (اینجا فرض 16:9 -> میشه از خود ویدیو هم گرفت)
+      let videoAspect = 16/9; // اگر مطمئنی نسبت فرق داره تغییر بده
+      let markerSize = 1; // ضلع مارکر = 1 واحد
+      let height = markerSize; 
+      let width = markerSize * videoAspect;
 
-        let geometry = new THREE.PlaneGeometry(width, height);
-        let material = new THREE.MeshBasicMaterial({map: texture, side: THREE.DoubleSide});
-        let mesh = new THREE.Mesh(geometry, material);
-        markerRoot.add(mesh);
-      });
+      let geometry = new THREE.PlaneGeometry(width, height);
+      let material = new THREE.MeshBasicMaterial({map: texture, side: THREE.DoubleSide});
+      let mesh = new THREE.Mesh(geometry, material);
+      markerRoot.add(mesh);
 
       // رندر
+      let lastTimeMsec = null
       animate()
-      function animate(){
+      function animate(nowMsec){
         requestAnimationFrame(animate)
         if (!arSource.ready) return
         arContext.update(arSource.domElement)
