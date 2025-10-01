@@ -1,52 +1,105 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <meta charset="utf-8">
-    <title>AR Video Full Marker</title>
-    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-    <script src="https://cdn.rawgit.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    <title>AR Video Marker</title>
+    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/three.js/build/ar-threex.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+      body, html {
+        margin: 0;
+        overflow: hidden;
+        width: 100%;
+        height: 100%;
+      }
+      video {
+        display: none;
+      }
+    </style>
   </head>
-  <body style="margin: 0; overflow: hidden;">
-    <a-scene
-      embedded
-      arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;"
-    >
-      <!-- مارکر مربعی -->
-      <a-marker type="pattern" url="marker.patt" id="marker">
-        <!-- ویدیو کاملاً هم‌اندازه مارکر -->
-        <a-video
-          id="carVideoEntity"
-          src="#carVideo"
-          width="1"
-          height="1"
-          position="0 0 0"
-          rotation="-90 0 0"
-        ></a-video>
-      </a-marker>
+  <body>
+    <video id="video" src="Carcar.mp4" playsinline webkit-playsinline></video>
 
-      <!-- منبع ویدیو -->
-      <a-assets>
-        <video id="carVideo" src="Carcar.mp4" loop="true" webkit-playsinline playsinline crossorigin="anonymous"></video>
-      </a-assets>
+    <script>
+      // ایجاد صحنه
+      let scene = new THREE.Scene();
+      let camera = new THREE.Camera();
+      scene.add(camera);
 
-      <a-entity camera></a-entity>
+      let renderer = new THREE.WebGLRenderer({antialias:true, alpha:true});
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      document.body.appendChild(renderer.domElement);
 
-      <script>
-        const marker = document.querySelector("#marker");
-        const video = document.querySelector("#carVideo");
+      // AR.js
+      let arSource = new THREEx.ArToolkitSource({ sourceType: 'webcam' });
+      arSource.init(() => {
+        setTimeout(() => {
+          onResize()
+        }, 2000);
+      });
 
-        // پخش ویدیو وقتی مارکر پیدا شد
-        marker.addEventListener("markerFound", () => {
-          video.play();
-        });
+      window.addEventListener('resize', () => {
+        onResize()
+      });
 
-        // توقف ویدیو وقتی مارکر ناپدید شد
-        marker.addEventListener("markerLost", () => {
-          video.pause();
-          video.currentTime = 0;
-        });
-      </script>
-    </a-scene>
+      function onResize(){
+        arSource.onResizeElement()
+        arSource.copyElementSizeTo(renderer.domElement)
+        if (arContext.arController !== null) {
+          arSource.copyElementSizeTo(arContext.arController.canvas)
+        }
+      }
+
+      let arContext = new THREEx.ArToolkitContext({
+        cameraParametersUrl: 'https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/three.js/data/camera_para.dat',
+        detectionMode: 'mono'
+      });
+
+      arContext.init(() => {
+        camera.projectionMatrix.copy(arContext.getProjectionMatrix())
+      });
+
+      let markerRoot = new THREE.Group();
+      scene.add(markerRoot);
+      let markerControls = new THREEx.ArMarkerControls(arContext, markerRoot, {
+        type: 'pattern',
+        patternUrl: 'marker.patt'
+      });
+
+      // ویدیو
+      let video = document.getElementById('video');
+      let texture = new THREE.VideoTexture(video);
+      texture.minFilter = THREE.LinearFilter;
+      texture.magFilter = THREE.LinearFilter;
+      texture.format = THREE.RGBFormat;
+
+      // وقتی ویدیو آماده شد، نسبت رو بگیر
+      video.addEventListener('loadedmetadata', () => {
+        let videoAspect = video.videoWidth / video.videoHeight;
+        let markerSize = 1; // ضلع مارکر = 1 واحد
+        let height = markerSize; 
+        let width = markerSize * videoAspect;
+
+        let geometry = new THREE.PlaneGeometry(width, height);
+        let material = new THREE.MeshBasicMaterial({map: texture, side: THREE.DoubleSide});
+        let mesh = new THREE.Mesh(geometry, material);
+        markerRoot.add(mesh);
+      });
+
+      // رندر
+      animate()
+      function animate(){
+        requestAnimationFrame(animate)
+        if (!arSource.ready) return
+        arContext.update(arSource.domElement)
+        renderer.render(scene, camera)
+
+        // پخش/توقف ویدیو با وجود یا عدم وجود مارکر
+        if(markerRoot.visible){
+          if(video.paused) video.play();
+        }else{
+          if(!video.paused) video.pause();
+        }
+      }
+    </script>
   </body>
-
 </html>
