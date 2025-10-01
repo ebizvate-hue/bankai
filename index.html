@@ -1,104 +1,97 @@
-<!DOCTYPE html>
-<html>
-  <head>
-    <title>AR Video Marker</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- اول Three.js -->
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
-    <!-- بعد AR.js نسخه‌ی three -->
-    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/three.js/build/ar-threex.js"></script>
-    <style>
-      body, html {
-        margin: 0;
-        overflow: hidden;
-        width: 100%;
-        height: 100%;
-        background: black;
-      }
-      video {
-        display: none;
-      }
-    </style>
-  </head>
-  <body>
-    <!-- ویدیو -->
-    <video id="video" src="Carcar.mp4" playsinline webkit-playsinline></video>
+<!doctype html>
+<html lang="fa">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AR Marker Video (Carcar.mp4)</title>
 
-    <script>
-      // صحنه و دوربین
-      let scene = new THREE.Scene();
-      let camera = new THREE.Camera();
-      scene.add(camera);
+  <!-- A-Frame and AR.js -->
+  <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.3.2/aframe/build/aframe-ar.js"></script>
 
-      let renderer = new THREE.WebGLRenderer({antialias:true, alpha:true});
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.setClearColor(new THREE.Color('black'), 0);
-      document.body.appendChild(renderer.domElement);
+  <style>
+    html, body { height: 100%; margin: 0; overflow: hidden; }
+    /* پنهان کردن ویدئو HTML5 از دید کاربر (فقط به عنوان تکسچر استفاده می‌شود) */
+    #ar-video { display: none; }
+  </style>
+</head>
+<body>
+  <!-- ویدئوی محلی که قرار است روی مارکر پخش شود -->
+  <video id="ar-video" src="Carcar.mp4" loop playsinline webkit-playsinline crossorigin="anonymous" muted></video>
 
-      // منبع AR (وبکم)
-      let arSource = new THREEx.ArToolkitSource({ sourceType: 'webcam' });
-      arSource.init(() => setTimeout(onResize, 2000));
+  <!-- صحنه A-Frame با AR.js (marker-based) -->
+  <a-scene
+    embedded
+    vr-mode-ui="enabled: false"
+    renderer="logarithmicDepthBuffer: true;"
+    arjs="sourceType: webcam; debugUIEnabled: false;"
+  >
+    <!-- دوربین مجازی AR -->
+    <a-entity camera></a-entity>
 
-      window.addEventListener('resize', onResize);
-      function onResize(){
-        arSource.onResizeElement();
-        arSource.copyElementSizeTo(renderer.domElement);
-        if (arContext.arController !== null) {
-          arSource.copyElementSizeTo(arContext.arController.canvas);
+    <!-- مارکر از نوع pattern با فایل marker.patt -->
+    <a-marker type="pattern" url="marker.patt" id="my-marker">
+      <!-- صفحه‌ای که ویدئو روی آن نمایش داده می‌شود -->
+      <!-- مقیاس/چرخش/مکان را بر اساس نیازتان تغییر دهید -->
+      <a-plane id="video-plane" position="0 0 0" rotation="-90 0 0" width="1.6" height="0.9" material="shader: flat; src: #ar-video;"></a-plane>
+    </a-marker>
+
+    <!-- یک محیط ساده برای نمایش بهتر -->
+    <a-entity light="type: ambient; intensity: 1"></a-entity>
+  </a-scene>
+
+  <script>
+    (function () {
+      const videoEl = document.getElementById('ar-video');
+      const marker = document.getElementById('my-marker');
+
+      // اطمینان از اینکه ویدئو در حالت loop است (همچنین در تگ video مشخص شده)
+      videoEl.loop = true;
+
+      // وقتی مارکر پیدا می‌شود — ویدیو پخش شود
+      marker.addEventListener('markerFound', async () => {
+        // برای موبایل‌ها اغلب لازم است ویدیو بی‌صدا (muted) باشد تا autoplay شود.
+        // در این کد video.muted=true قرار داده‌ایم تا پخش خودکار هنگام شناسایی مارکر کار کند.
+        try {
+          // اگر ویدیو هنوز بارگذاری نشده، تلاش برای بارگزاری
+          if (videoEl.readyState < 2) {
+            await videoEl.load();
+          }
+          // تلاش برای پخش
+          const playPromise = videoEl.play();
+          if (playPromise !== undefined) {
+            playPromise.catch(e => {
+              // در صورت بروز خطا (مثل policy autoplay) آن را نادیده می‌گیریم
+              // کاربر می‌تواند بعداً با تعامل صوتی را فعال کند
+              console.warn('Video play prevented:', e);
+            });
+          }
+        } catch (err) {
+          console.error('Error while trying to play video:', err);
         }
-      }
-
-      // کانتکست AR
-      let arContext = new THREEx.ArToolkitContext({
-        cameraParametersUrl: 'https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/three.js/data/camera_para.dat',
-        detectionMode: 'mono'
-      });
-      arContext.init(() => {
-        camera.projectionMatrix.copy(arContext.getProjectionMatrix());
       });
 
-      // ریشه مارکر
-      let markerRoot = new THREE.Group();
-      scene.add(markerRoot);
-      let markerControls = new THREEx.ArMarkerControls(arContext, markerRoot, {
-        type: 'pattern',
-        patternUrl: 'marker.patt'
-      });
-
-      // ویدیو
-      let video = document.getElementById('video');
-      let texture = new THREE.VideoTexture(video);
-      texture.minFilter = THREE.LinearFilter;
-      texture.magFilter = THREE.LinearFilter;
-      texture.format = THREE.RGBFormat;
-
-      // وقتی ویدیو لود شد -> Plane بساز
-      video.addEventListener('loadedmetadata', () => {
-        let aspect = video.videoWidth / video.videoHeight;
-        let markerSize = 1;   // ضلع مارکر (واحد AR.js)
-        let height = markerSize;      // بالا و پایین همتراز مارکر
-        let width  = markerSize * aspect; // عریض‌تر از مارکر
-
-        let geometry = new THREE.PlaneGeometry(width, height);
-        let material = new THREE.MeshBasicMaterial({map: texture, side: THREE.DoubleSide});
-        let mesh = new THREE.Mesh(geometry, material);
-        markerRoot.add(mesh);
-      });
-
-      // حلقه رندر
-      function animate(){
-        requestAnimationFrame(animate);
-        if (!arSource.ready) return;
-        arContext.update(arSource.domElement);
-        renderer.render(scene, camera);
-
-        if(markerRoot.visible){
-          if(video.paused) video.play();
-        } else {
-          if(!video.paused) video.pause();
+      // وقتی مارکر گم می‌شود — ویدیو متوقف و به ابتدای ویدیو برمی‌گردد
+      marker.addEventListener('markerLost', () => {
+        try {
+          videoEl.pause();
+          // بازگرداندن به شروع تا از ادامهٔ قبلی جلوگیری شود
+          videoEl.currentTime = 0;
+        } catch (err) {
+          console.error('Error while trying to pause/rewind video:', err);
         }
-      }
-      animate();
-    </script>
-  </body>
+      });
+
+      // اگر خواستید کاربر با لمس صدا رو فعال کنه — یک بار gesture برای unmute:
+      // (اختیاری) — اگر مایلید uncomment کنید
+      /*
+      window.addEventListener('click', () => {
+        if (videoEl.muted) {
+          videoEl.muted = false;
+        }
+      }, { once: true });
+      */
+    })();
+  </script>
+</body>
 </html>
