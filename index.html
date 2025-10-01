@@ -2,14 +2,18 @@
 <html>
   <head>
     <title>AR Video Marker</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- اول Three.js -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+    <!-- بعد AR.js نسخه‌ی three -->
     <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/three.js/build/ar-threex.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
       body, html {
         margin: 0;
         overflow: hidden;
         width: 100%;
         height: 100%;
+        background: black;
       }
       video {
         display: none;
@@ -17,23 +21,25 @@
     </style>
   </head>
   <body>
+    <!-- ویدیو -->
     <video id="video" src="Carcar.mp4" playsinline webkit-playsinline></video>
 
     <script>
-      // صحنه
+      // صحنه و دوربین
       let scene = new THREE.Scene();
       let camera = new THREE.Camera();
       scene.add(camera);
 
       let renderer = new THREE.WebGLRenderer({antialias:true, alpha:true});
       renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setClearColor(new THREE.Color('black'), 0);
       document.body.appendChild(renderer.domElement);
 
-      // منبع AR
+      // منبع AR (وبکم)
       let arSource = new THREEx.ArToolkitSource({ sourceType: 'webcam' });
-      arSource.init(() => { setTimeout(onResize, 2000); });
-      window.addEventListener('resize', onResize);
+      arSource.init(() => setTimeout(onResize, 2000));
 
+      window.addEventListener('resize', onResize);
       function onResize(){
         arSource.onResizeElement();
         arSource.copyElementSizeTo(renderer.domElement);
@@ -51,7 +57,7 @@
         camera.projectionMatrix.copy(arContext.getProjectionMatrix());
       });
 
-      // مارکر
+      // ریشه مارکر
       let markerRoot = new THREE.Group();
       scene.add(markerRoot);
       let markerControls = new THREEx.ArMarkerControls(arContext, markerRoot, {
@@ -66,12 +72,12 @@
       texture.magFilter = THREE.LinearFilter;
       texture.format = THREE.RGBFormat;
 
-      // وقتی ویدیو آماده شد
+      // وقتی ویدیو لود شد -> Plane بساز
       video.addEventListener('loadedmetadata', () => {
-        let videoAspect = video.videoWidth / video.videoHeight; // نسبت تصویر
-        let markerSize = 1; // ضلع مارکر
-        let height = markerSize; // هم‌تراز شدن بالا و پایین
-        let width = markerSize * videoAspect; // عرض بیشتر از مارکر
+        let aspect = video.videoWidth / video.videoHeight;
+        let markerSize = 1;   // ضلع مارکر (واحد AR.js)
+        let height = markerSize;      // بالا و پایین همتراز مارکر
+        let width  = markerSize * aspect; // عریض‌تر از مارکر
 
         let geometry = new THREE.PlaneGeometry(width, height);
         let material = new THREE.MeshBasicMaterial({map: texture, side: THREE.DoubleSide});
@@ -79,14 +85,13 @@
         markerRoot.add(mesh);
       });
 
-      // رندر
+      // حلقه رندر
       function animate(){
         requestAnimationFrame(animate);
         if (!arSource.ready) return;
         arContext.update(arSource.domElement);
         renderer.render(scene, camera);
 
-        // کنترل پخش و توقف
         if(markerRoot.visible){
           if(video.paused) video.play();
         } else {
